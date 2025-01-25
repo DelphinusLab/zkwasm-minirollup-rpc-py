@@ -1,3 +1,5 @@
+from typing import List
+
 import requests
 import json
 import time
@@ -13,6 +15,7 @@ class ZKWasmAppRpc:
 
     def send_raw_transaction(self, cmd: list[int], prikey: str) -> dict:
         data = sign(cmd, prikey)
+        print("SendRawTransaction", data)
         response = self.session.post(f"{self.base_url}/send", json=data)
         if response.status_code == 201:
             return response.json()
@@ -58,7 +61,29 @@ class ZKWasmAppRpc:
         else:
             raise Exception("QueryJobError")
 
+    @staticmethod
+    def create_command(nonce: int, command: int, params: List[int]) -> List[int]:
+        cmd = (nonce << 16) + ((len(params) + 1) << 8) + command
+        buf = [cmd] + params
+        print("CreateCommand", buf)
+        return buf
+
+    def compose_withdraw_params(self, address: str, nonce: int, command: int, amount: int, token_index: int)\
+            -> List[int]:
+        if address.startswith("0x"):
+            address = address[2:]
+        address_be = bytes.fromhex(address)
+        first_limb = int.from_bytes(address_be[:4][::-1], byteorder="big")
+        snd_limb = int.from_bytes(address_be[4:12][::-1], byteorder="big")
+        third_limb = int.from_bytes(address_be[12:20][::-1], byteorder="big")
+        one = (first_limb << 32) + amount
+        return self.create_command(nonce, command, [token_index, one, snd_limb, third_limb])
+
     def get_nonce(self, prikey: str) -> int:
         state = self.query_state(prikey)
         data = json.loads(state["data"])
         return int(data["player"]["nonce"])
+
+
+def create_command():
+    return None

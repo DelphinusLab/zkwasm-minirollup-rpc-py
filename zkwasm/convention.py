@@ -1,5 +1,7 @@
 import hashlib
 import os
+from typing import List
+
 from web3 import Web3
 from decimal import Decimal
 import json
@@ -12,13 +14,6 @@ def bytes_to_hex(bytes):
 def bytes_to_decimal(bytes):
     return "".join(f"{byte:02d}" for byte in bytes)
 
-
-def compose_withdraw_params(address, amount):
-    address_be = address.to_bytes(20, byteorder="big")
-    first_limb = int.from_bytes(address_be[:4][::-1], byteorder="big")
-    snd_limb = int.from_bytes(address_be[4:12][::-1], byteorder="big")
-    third_limb = int.from_bytes(address_be[12:20][::-1], byteorder="big")
-    return [(first_limb << 32) + amount, snd_limb, third_limb]
 
 
 def decode_withdraw(txdata):
@@ -47,8 +42,22 @@ class PlayerConvention:
         self.command_deposit = command_deposit
         self.command_withdraw = command_withdraw
 
-    def create_command(self, nonce, command, objindex):
-        return (nonce << 16) + (objindex << 8) + command
+    @staticmethod
+    def create_command(nonce: int, command: int, params: List[int]) -> List[int]:
+        cmd = (nonce << 16) + ((len(params) + 1) << 8) + command
+        buf = [cmd] + params
+        return buf
+
+    def compose_withdraw_params(self, address: str, nonce: int, command: int, amount: int, token_index: int)\
+            -> List[int]:
+        if address.startswith("0x"):
+            address = address[2:]
+        address_be = bytes.fromhex(address)
+        first_limb = int.from_bytes(address_be[:4][::-1], byteorder="big")
+        snd_limb = int.from_bytes(address_be[4:12][::-1], byteorder="big")
+        third_limb = int.from_bytes(address_be[12:20][::-1], byteorder="big")
+        one = (first_limb << 32) + amount
+        return self.create_command(nonce, command, [token_index, one, snd_limb, third_limb])
 
     async def get_config(self):
         config = await self.rpc.query_config()

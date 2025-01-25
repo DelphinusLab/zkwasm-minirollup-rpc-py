@@ -1,6 +1,8 @@
 from .CurveField import CurveField
+from .Field import Field
 from .Point import Point
 from .PrivateKey import PrivateKey
+from .poseidon import poseidon
 
 
 def big_endian_hex_to_int(hex_string):
@@ -17,7 +19,7 @@ def little_endian_hex_to_int(hex_string):
     if len(hex_string) % 2 != 0:
         hex_string = "0" + hex_string
     reversed_hex = "".join(
-        [hex_string[i : i + 2] for i in range(len(hex_string) - 2, -1, -2)]
+        [hex_string[i: i + 2] for i in range(len(hex_string) - 2, -1, -2)]
     )
     return int(reversed_hex, 16)
 
@@ -26,8 +28,8 @@ def u8_to_hex(u8_array: bytearray) -> str:
     return "".join(f"{byte:02x}" for byte in u8_array)
 
 
-def bn_to_hex_le(n: int) -> str:
-    bytes_le = n.to_bytes(32, byteorder="little", signed=False)
+def bn_to_hex_le(n: int, length: int = 32) -> str:
+    bytes_le = n.to_bytes(length, byteorder="little", signed=False)
     return u8_to_hex(bytes_le)
 
 
@@ -61,17 +63,36 @@ def sign(cmd, prikey):
     pkey = PrivateKey.from_string(prikey)
     r = pkey.r()
     R = Point.base().mul(r)
-    H = cmd[0] + (cmd[1] << 64) + (cmd[2] << 128) + (cmd[3] << 192)
-    hbn = CurveField(H)
-    S = r.add(pkey.key.mul(hbn))
+
+    # Calculate H using poseidon hash
+    fvalues = []
+    h = 0
+    i = 0
+    while i < len(cmd):
+        v = 0
+        for j in range(3):
+            if i + j < len(cmd):
+                v += cmd[i + j] << (64 * j)
+                h += cmd[i + j] << (64 * (j + i))
+        i += 3
+        fvalues.append(Field(v))
+
+    H = poseidon(fvalues).v
+    hbn = H
+    msgbn = h
+
+
+    S = r.add(pkey.key.mul(CurveField(hbn)))
     pubkey = pkey.public_key
+
     data = {
-        "msg": bn_to_hex_le(hbn.v),
-        "pkx": bn_to_hex_le(pubkey.key.x.v),
-        "pky": bn_to_hex_le(pubkey.key.y.v),
-        "sigx": bn_to_hex_le(R.x.v),
-        "sigy": bn_to_hex_le(R.y.v),
-        "sigr": bn_to_hex_le(S.v),
+        'msg': bn_to_hex_le(msgbn, len(cmd) * 8),
+        'hash': bn_to_hex_le(hbn),
+        'pkx': bn_to_hex_le(pubkey.key.x.v),
+        'pky': bn_to_hex_le(pubkey.key.y.v),
+        'sigx': bn_to_hex_le(R.x.v),
+        'sigy': bn_to_hex_le(R.y.v),
+        'sigr': bn_to_hex_le(S.v),
     }
     return data
 
