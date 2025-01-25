@@ -9,7 +9,6 @@ from zkwasm.sign import get_pid
 class TestZKWasmAppRpc(unittest.TestCase):
 
     def setUp(self):
-        # self.rpc = ZKWasmAppRpc("https://zk-server.pumpelf.ai")
         self.rpc = ZKWasmAppRpc("http://localhost:3000")
 
     def get_nonce(self, prikey: str) -> int:
