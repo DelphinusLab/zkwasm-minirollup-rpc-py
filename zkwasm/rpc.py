@@ -16,7 +16,6 @@ class ZKWasmAppRpc:
 
     def send_raw_transaction(self, cmd: list[int], prikey: str) -> dict:
         data = sign(cmd, prikey)
-        print("SendRawTransaction", data)
         response = self.session.post(f"{self.base_url}/send", json=data)
         if response.status_code == 201:
             return response.json()
@@ -66,7 +65,6 @@ class ZKWasmAppRpc:
     def create_command(nonce: int, command: int, params: List[int]) -> List[int]:
         cmd = (nonce << 16) + ((len(params) + 1) << 8) + command
         buf = [cmd] + params
-        print("CreateCommand", buf)
         return buf
 
     def compose_withdraw_params(self, address: str, nonce: int, command: int, amount: int, token_index: int)\
@@ -156,7 +154,6 @@ class AsyncZKWasmAppRpc:
     async def create_command(nonce: int, command: int, params: List[int]) -> List[int]:
         cmd = (nonce << 16) + ((len(params) + 1) << 8) + command
         buf = [cmd] + params
-        print("CreateCommand", buf)
         return buf
 
     async def compose_withdraw_params(self, address: str, nonce: int, command: int, amount: int, token_index: int) \
